@@ -10,6 +10,8 @@
 
 const uint8_t USER_BTN_PIN = 27;
 
+const char* CONFIG_AP_NAME = "WeatherStationConfig";
+
 Button userBtn(USER_BTN_PIN);
 
 bool connectToWiFi(bool useScreen) {
@@ -28,38 +30,73 @@ bool connectToWiFi(bool useScreen) {
   wm.setConfigPortalTimeout(60);
   Serial.println("Attempting connection to WiFi");
 
+  display.setFont(&FreeMono9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.fillScreen(GxEPD_WHITE);
+
+  display.setCursor(0, 10);
+
   if (userBtn.read() == Button::PRESSED) {
     wm.resetSettings();
-    Serial.println("Removed WiFi configuration");
+    Serial.println("WiFi configuration deleted.");
+    display.println("WiFi configuration deleted.");
   }
 
-  if (!wm.autoConnect("WeatherStationConfig")) {
+  display.println("Connecting to WiFi...");
+  if (useScreen) {
+    display.display();
+  }
+
+  if (!wm.autoConnect(CONFIG_AP_NAME)) {
     while (true) {
       if (wm.process()) {
         break;
       }
       if (startedConfigAP && !displayedAboutStartedConfigAP) {
-        Serial.println("Failed to connect to WiFi, starting configuration AP");
+        Serial.println("Failed to connect to WiFi, starting configuration AP.");
+        Serial.print("Join the WiFi network \"");
+        Serial.print(CONFIG_AP_NAME);
+        Serial.println("\" and open http://192.168.4.1 to open the WiFi credential configuration page.");
+         display.println(
+            "Failed to connect to WiFi, starting configuration AP.");
+         display.print("Join the WiFi network \"");
+         display.print(CONFIG_AP_NAME);
+         display.println("\" and open http://192.168.4.1 to open the WiFi "
+                       "credential configuration page.");
+         if (useScreen) {
+           display.display();
+        }
         displayedAboutStartedConfigAP = true;
       }
       if (configAPTimedOut && !displayedAboutConfigAPTimedOut) {
-        Serial.println("Configuration AP timed out, exiting");
+        Serial.println("Configuration AP timed out, exiting.");
+        display.println("Configuration AP timed out, exiting.");
         displayedAboutConfigAPTimedOut = true;
         goto wifiConnectFailed;
       }
     }
   }
-  Serial.println("Successfully connected to saved WiFi network");
+  Serial.println("Successfully connected to saved WiFi network!");
   Serial.print("Connected to: ");
   Serial.println(WiFi.SSID());
   Serial.print("RSSI: ");
   Serial.println(WiFi.RSSI());
   Serial.print("Local IPv4 address: ");
   Serial.println(WiFi.localIP());
+  display.println("Successfully connected to WiFi!");
+  if (useScreen) {
+    display.display();
+    delay(5000);
+  }
   return true;
 
 wifiConnectFailed:
-  Serial.println("Failed to connect to WiFi");
+  Serial.println("Failed to connect to WiFi!");
+  display.println("Failed to connect to WiFi!");
+  if (useScreen) {
+    display.display();
+    delay(5000);
+  }
   return false;
 }
 
@@ -78,7 +115,7 @@ void setup() {
   display.setTextColor(GxEPD_BLACK);
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
-  display.display(false);
+  display.display();
 
   connectToWiFi(true);
 }
