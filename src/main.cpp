@@ -1,5 +1,6 @@
 #include <Adafruit_GFX.h>
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <Button.h>
 #include <Fonts/FreeMono9pt7b.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
@@ -8,6 +9,7 @@
 #include <OpenWeather.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WiFiManager.h>
 
 const uint8_t USER_BTN_PIN = 27;
@@ -37,6 +39,15 @@ OW_Weather ow;
 OW_current current;
 OW_hourly hourly;
 OW_daily daily;
+
+const uint8_t OW_GEOREV_STR_SIZE = 64 + 1;
+// clang-format off
+struct OW_GeocodingReverse {
+  char name[OW_GEOREV_STR_SIZE] = {0};
+  char state[OW_GEOREV_STR_SIZE] = {0};
+  char country[OW_GEOREV_STR_SIZE] = {0};
+} georev;
+// clang-format on
 
 RTC_DATA_ATTR bool lastUpdateSuccess = false;
 
@@ -219,10 +230,73 @@ wifiConnectFailed:
   return false;
 }
 
+bool updateGeocodingReverse() {
+  Serial.println("Calling reverse geocoding API");
+  Serial.print("Latitude: ");
+  Serial.println(latitude);
+  Serial.print("Longitude: ");
+  Serial.println(longitude);
+  WiFiClientSecure client;
+  client.setInsecure();
+  const char* host = "api.openweathermap.org";
+  const uint16_t port = 443;
+  if (!client.connect(host, port)) {
+    Serial.println("Connection failed");
+    return false;
+  }
+  client.print("GET ");
+  client.print("/geo/1.0/reverse?lat=");
+  client.print(latitude);
+  client.print("&lon=");
+  client.print(longitude);
+  client.print("6&limit=1&lang=");
+  client.print(lang);
+  client.print("en&appid=");
+  client.print(apiKey);
+  client.print(" HTTP/1.1\r\n");
+  client.print("Host: ");
+  client.print(host);
+  client.print("\r\nConnection: close\r\n\r\n");
+  if (client.println() == 0) {
+    Serial.println("Failed to send request");
+    return false;
+  }
+  Serial.println("Sent request, pulling out header");
+  if (!client.find("\r\n\r\n")) {
+    Serial.println("Could not find end of headers");
+    return false;
+  }
+  Serial.println("Found end of header");
+  Serial.println("Parsing JSON");
+  StaticJsonDocument<1536> doc;
+  DeserializationError error = deserializeJson(doc, client);
+  if (error) {
+    Serial.print("JSON deserialization failed: ");
+    Serial.println(error.c_str());
+    return false;
+  }
+  strncpy(georev.name, doc[0]["name"], OW_GEOREV_STR_SIZE);
+  strncpy(georev.state, doc[0]["state"], OW_GEOREV_STR_SIZE);
+  strncpy(georev.country, doc[0]["country"], OW_GEOREV_STR_SIZE);
+  Serial.print("Name: ");
+  Serial.println(georev.name);
+  Serial.print("State: ");
+  Serial.println(georev.state);
+  Serial.print("Country: ");
+  Serial.println(georev.country);
+  client.stop();
+  return true;
+}
+
 bool updateWeather(bool useScreen) {
   Serial.println("Getting weather from OpenWeather");
   bool success = ow.getForecast(&current, &hourly, &daily, apiKey, latitude,
                                 longitude, units, lang);
+  if (strlen(georev.name) == 0) {
+    Serial.println("Determined name from coordinates empty, calling reverse "
+                   "geocoding API");
+    success &= updateGeocodingReverse();
+  }
   if (success) {
     Serial.println("Obtained weather successfully!");
     display.println("Obtained weather successfully!");
@@ -253,6 +327,12 @@ void printWeather() {
   Serial.println(ow.lon);
   Serial.print("Timezone            : ");
   Serial.println(ow.timezone);
+  Serial.print("Name                : ");
+  Serial.println(georev.name);
+  Serial.print("State               : ");
+  Serial.println(georev.state);
+  Serial.print("Country             : ");
+  Serial.println(georev.country);
   Serial.println();
 
   Serial.println("############### Current weather ###############\n");
@@ -420,7 +500,9 @@ void printWeather() {
 }
 
 void displayWeather() {
-
+  Serial.println("Displaying weather");
+  display.fillScreen(GxEPD_WHITE);
+  display.display();
 }
 
 void setup() {
@@ -460,6 +542,7 @@ void setup() {
   connectToWiFi(showBootup);
   updateWeather(showBootup);
   printWeather();
+  displayWeather();
 
   lastUpdateSuccess = true;
   Serial.print("Updating again in ");
