@@ -5,13 +5,18 @@
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <GxEPD2_BW.h>
 #include <GxEPD2_display_selection_new_style.h>
+#include <OpenWeather.h>
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
 
 const uint8_t USER_BTN_PIN = 27;
+const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
 
 const char* CONFIG_AP_NAME = "WeatherStationConfig";
+
+const uint32_t FAIL_RETRY_TIME = 1;
+const uint32_t UPDATE_TIME = 5;
 
 const size_t API_KEY_SIZE = 32 + 1;
 char apiKey[API_KEY_SIZE] = "";
@@ -27,6 +32,38 @@ const size_t LANG_SIZE = 2 + 1;
 char lang[LANG_SIZE] = "en";
 
 Button userBtn(USER_BTN_PIN);
+
+OW_Weather ow;
+OW_current current;
+OW_hourly hourly;
+OW_daily daily;
+
+RTC_DATA_ATTR bool lastUpdateSuccess = false;
+
+void printWakeupReason() {
+  esp_sleep_wakeup_cause_t reason = esp_sleep_get_wakeup_cause();
+
+  switch (reason) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      Serial.println("Wakeup caused by external signal using RTC_IO");
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+      Serial.println("Wakeup caused by external signal using RTC_CNTL");
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      Serial.println("Wakeup caused by timer");
+      break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD:
+      Serial.println("Wakeup caused by touch");
+      break;
+    case ESP_SLEEP_WAKEUP_ULP:
+      Serial.println("Wakeup caused by ULP program");
+      break;
+    default:
+      Serial.printf("Wakeup was not caused by deep sleep: %d\n", reason);
+      break;
+  }
+}
 
 void loadParams() {
   Serial.println("Loading weather configuration into memory");
@@ -182,8 +219,27 @@ wifiConnectFailed:
   return false;
 }
 
+bool updateWeather(bool useScreen) {
+  Serial.println("Getting weather from OpenWeather");
+  bool success = ow.getForecast(&current, &hourly, &daily, apiKey, latitude,
+                                longitude, units, lang);
+  if (success) {
+    Serial.println("Obtained weather successfully!");
+    display.println("Obtained weather successfully!");
+  } else {
+    Serial.println("Failed to get weather!");
+    display.println("Failed to get weather!");
+  }
+  if (useScreen) {
+    display.display();
+    delay(5000);
+  }
+  return success;
+}
+
 void setup() {
   Serial.begin(9600);
+  Serial.println();
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -197,9 +253,51 @@ void setup() {
   display.setTextColor(GxEPD_BLACK);
   display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
-  display.display();
 
-  connectToWiFi(true);
+  bool showBootup = true;
+
+  printWakeupReason();
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER &&
+      lastUpdateSuccess) {
+    showBootup = false;
+  }
+
+  if (showBootup) {
+    Serial.println("Showing bootup text");
+    display.display();
+  } else {
+    Serial.println("Not showing bootup text");
+  }
+
+  esp_sleep_enable_ext0_wakeup(USER_BTN_RTC_PIN, 0);
+
+  connectToWiFi(showBootup);
+  // updateWeather(showBootup);
+
+  lastUpdateSuccess = true;
+  Serial.print("Updating again in ");
+  Serial.print(UPDATE_TIME);
+  Serial.println(" minute...");
+  delay(1000);
+  Serial.print("Deep sleeping for ");
+  Serial.print(UPDATE_TIME);
+  Serial.println(" minutes");
+  ESP.deepSleep(UPDATE_TIME * 60 * 1000000);
+
+somethingFailed:
+  lastUpdateSuccess = false;
+  Serial.print("Trying again in ");
+  Serial.print(FAIL_RETRY_TIME);
+  Serial.println(" minute...");
+  display.print("Trying again in ");
+  display.print(FAIL_RETRY_TIME);
+  display.println(" minute...");
+  display.display();
+  delay(1000);
+  Serial.print("Deep sleeping for ");
+  Serial.print(FAIL_RETRY_TIME);
+  Serial.println(" minutes");
+  ESP.deepSleep(FAIL_RETRY_TIME * 60 * 1000000);
 }
 
 void loop() {}
