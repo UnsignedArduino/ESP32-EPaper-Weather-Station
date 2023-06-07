@@ -2,8 +2,10 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Button.h>
+#include <Fonts/FreeMono12pt7b.h>
+#include <Fonts/FreeMono18pt7b.h>
+#include <Fonts/FreeMono24pt7b.h>
 #include <Fonts/FreeMono9pt7b.h>
-#include <Fonts/FreeMonoBold9pt7b.h>
 #include <GxEPD2_BW.h>
 #include <GxEPD2_display_selection_new_style.h>
 #include <OpenWeather.h>
@@ -11,14 +13,20 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+#include <time.h>
 
 const uint8_t USER_BTN_PIN = 27;
 const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
 
 const char* CONFIG_AP_NAME = "WeatherStationConfig";
 
-const uint32_t FAIL_RETRY_TIME = 1;
-const uint32_t UPDATE_TIME = 5;
+const uint32_t FAIL_RETRY_TIME = 1; // minutes
+const uint32_t UPDATE_TIME = 5;     // minutes
+
+const char* NTP_SERVER = "pool.ntp.org";
+
+uint32_t TZ_OFFSET = 0;               // seconds
+uint16_t DAYLIGHT_SAVINGS_OFFSET = 0; // seconds
 
 const size_t API_KEY_SIZE = 32 + 1;
 char apiKey[API_KEY_SIZE] = "";
@@ -46,8 +54,10 @@ struct OW_GeocodingReverse {
   char name[OW_GEOREV_STR_SIZE] = {0};
   char state[OW_GEOREV_STR_SIZE] = {0};
   char country[OW_GEOREV_STR_SIZE] = {0};
-} georev;
+} RTC_DATA_ATTR georev;
 // clang-format on
+
+struct tm timeInfo;
 
 RTC_DATA_ATTR bool lastUpdateSuccess = false;
 
@@ -230,6 +240,18 @@ wifiConnectFailed:
   return false;
 }
 
+bool updateTime() {
+  Serial.println("Configuring time");
+  configTime(TZ_OFFSET, DAYLIGHT_SAVINGS_OFFSET, NTP_SERVER);
+  if (!getLocalTime(&timeInfo)) {
+    Serial.println("Failed to obtain time");
+    return false;
+  }
+  Serial.print("Time is ");
+  Serial.println(&timeInfo, "%A, %B %d %Y %H:%M:%S");
+  return true;
+}
+
 bool updateGeocodingReverse() {
   Serial.println("Calling reverse geocoding API");
   Serial.print("Latitude: ");
@@ -290,13 +312,8 @@ bool updateGeocodingReverse() {
 
 bool updateWeather(bool useScreen) {
   Serial.println("Getting weather from OpenWeather");
-  bool success = ow.getForecast(&current, &hourly, &daily, apiKey, latitude,
-                                longitude, units, lang);
-  if (strlen(georev.name) == 0) {
-    Serial.println("Determined name from coordinates empty, calling reverse "
-                   "geocoding API");
-    success &= updateGeocodingReverse();
-  }
+  const bool success = ow.getForecast(&current, &hourly, &daily, apiKey,
+                                      latitude, longitude, units, lang);
   if (success) {
     Serial.println("Obtained weather successfully!");
     display.println("Obtained weather successfully!");
@@ -501,7 +518,10 @@ void printWeather() {
 
 void displayWeather() {
   Serial.println("Displaying weather");
+  display.setTextColor(GxEPD_BLACK);
+  display.setFullWindow();
   display.fillScreen(GxEPD_WHITE);
+
   display.display();
 }
 
@@ -540,6 +560,12 @@ void setup() {
   esp_sleep_enable_ext0_wakeup(USER_BTN_RTC_PIN, 0);
 
   connectToWiFi(showBootup);
+  updateTime();
+  if (strlen(georev.name) == 0) {
+    Serial.println("Determined name from coordinates empty, calling reverse "
+                   "geocoding API");
+    updateGeocodingReverse();
+  }
   updateWeather(showBootup);
   printWeather();
   displayWeather();
