@@ -16,6 +16,10 @@
 #include <WiFiManager.h>
 #include <time.h>
 
+// Useful for debugging to go right to the weather screen
+#define FAST_BOOT
+const uint32_t SERIAL_SPEED = 115200;
+
 const uint8_t USER_BTN_PIN = 27;
 const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
 
@@ -761,7 +765,8 @@ void drawBitmapFromSpiffs(const char* filename, int16_t x, int16_t y,
             }
           } // end pixel
           uint16_t yrow = y + (flip ? h - row - 1 : row);
-          // display.writeImage(output_row_mono_buffer, output_row_color_buffer, x,
+          // display.writeImage(output_row_mono_buffer, output_row_color_buffer,
+          // x,
           //                    yrow, w, 1);
           display.drawBitmap(x, yrow, output_row_mono_buffer, w, 1,
                              GxEPD_BLACK);
@@ -838,16 +843,57 @@ void displayWeather() {
   display.setTextColor(GxEPD_BLACK);
   display.fillScreen(GxEPD_WHITE);
 
-  String weatherIcon = getMeteoconIcon(current.id);
-  String iconPath = "/icon/" + weatherIcon + ".bmp";
+  Serial.print("Heap: ");
+  Serial.print(ESP.getFreeHeap() / 1024);
+  Serial.println(" KiB");
 
-  drawBitmapFromSpiffs(iconPath.c_str(), 2, 2);
+  display.setFont(&FreeMono9pt7b);
+  display.setCursor(103, 21);
+  display.print(georev.name);
+  display.print(", ");
+  display.print(georev.state);
+  display.print(", ");
+  display.print(georev.country);
+
+  display.setFont(&FreeMono24pt7b);
+  display.setCursor(100, 56);
+  display.print(current.main);
+
+  uint16_t currX = 100;
+
+  const String temp = String(current.temp, 0);
+  display.setFont(&FreeMono18pt7b);
+  display.setCursor(currX, 84);
+  display.print(temp);
+
+  int16_t x, y;
+  uint16_t w, h;
+  display.getTextBounds(String(temp), 100, 84, &x, &y, &w, &h);
+  display.setFont(&FreeMono9pt7b);
+  currX = x + w + 4; 
+  display.setCursor(currX, y + 10);
+  if (strcmp(units, "imperial") == 0) {
+    display.print("oF");
+  } else {
+    display.print("oC");
+  }
+
+  // display.getTextBounds("oF", currX, y + 10, &x, &y, &w, &h);
+  // currX += w + 4;
+
+  drawBitmapFromSpiffs(
+      String("/icon/" + String(getMeteoconIcon(current.id)) + ".bmp").c_str(),
+      2, 2);
 
   display.display();
+
+  Serial.print("Heap: ");
+  Serial.print(ESP.getFreeHeap() / 1024);
+  Serial.println(" KiB");
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(SERIAL_SPEED);
   Serial.println();
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -860,7 +906,7 @@ void setup() {
     Serial.println("SPIFFS failed");
   }
 
-  display.init(9600, true, 2, false);
+  display.init(SERIAL_SPEED, true, 2, false);
   display.setRotation(0);
   display.setFont(&FreeMono9pt7b);
   display.setTextColor(GxEPD_BLACK);
@@ -881,6 +927,11 @@ void setup() {
   } else {
     Serial.println("Not showing bootup text");
   }
+
+#ifdef FAST_BOOT
+  Serial.println("Fast bootup enabled, not showing bootup text");
+  showBootup = false;
+#endif
 
   esp_sleep_enable_ext0_wakeup(USER_BTN_RTC_PIN, 0);
 
