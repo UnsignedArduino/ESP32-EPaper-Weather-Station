@@ -863,7 +863,7 @@ const char* getMeteoconIcon(uint16_t id, bool today = true) {
   if (id / 100 == 4)
     return "unknown";
   if (id == 500)
-    return "lightRain";
+    return "light-rain";
   else if (id == 511)
     return "sleet";
   else if (id / 100 == 5)
