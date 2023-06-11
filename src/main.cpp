@@ -26,7 +26,7 @@ const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
 const char* CONFIG_AP_NAME = "WeatherStationConfig";
 
 const uint32_t FAIL_RETRY_TIME = 2; // minutes
-const uint32_t UPDATE_TIME = 10;     // minutes
+const uint32_t UPDATE_TIME = 10;    // minutes
 
 const char* NTP_SERVER = "pool.ntp.org";
 
@@ -59,15 +59,17 @@ struct OW_GeocodingReverse {
   char name[OW_GEOREV_STR_SIZE] = {0};
   char state[OW_GEOREV_STR_SIZE] = {0};
   char country[OW_GEOREV_STR_SIZE] = {0};
-} RTC_DATA_ATTR georev;
+};
 // clang-format on
+RTC_DATA_ATTR OW_GeocodingReverse georev;
 
 // clang-format off
 struct OW_extra {
   float temp_min;
   float temp_max;
-} RTC_DATA_ATTR extra;
+};
 // clang-format on
+RTC_DATA_ATTR OW_extra extra;
 
 struct tm timeInfo;
 
@@ -323,56 +325,56 @@ bool updateGeocodingReverse() {
 }
 
 bool updateExtra() {
-    Serial.println("Calling weather API");
-    WiFiClientSecure client;
-    client.setInsecure();
-    const char* host = "api.openweathermap.org";
-    const uint16_t port = 443;
-    if (!client.connect(host, port)) {
-      Serial.println("Connection failed");
-      return false;
-    }
-    client.print("GET ");
-    client.print("/data/2.5/weather?lat=");
-    client.print(latitude);
-    client.print("&lon=");
-    client.print(longitude);
-    client.print("&units=");
-    client.print(units);
-    client.print("&lang=");
-    client.print(lang);
-    client.print("en&appid=");
-    client.print(apiKey);
-    client.print(" HTTP/1.1\r\n");
-    client.print("Host: ");
-    client.print(host);
-    client.print("\r\nConnection: close\r\n\r\n");
-    if (client.println() == 0) {
-      Serial.println("Failed to send request");
-      return false;
-    }
-    Serial.println("Sent request, pulling out header");
-    if (!client.find("\r\n\r\n")) {
-      Serial.println("Could not find end of headers");
-      return false;
-    }
-    Serial.println("Found end of header");
-    Serial.println("Parsing JSON");
-    StaticJsonDocument<1024> doc;
-    DeserializationError error = deserializeJson(doc, client);
-    if (error) {
-      Serial.print("JSON deserialization failed: ");
-      Serial.println(error.c_str());
-      return false;
-    }
-    extra.temp_min = doc["main"]["temp_min"];
-    extra.temp_max = doc["main"]["temp_max"];
-    Serial.print("Minimum: ");
-    Serial.println(extra.temp_min);
-    Serial.print("Maximum: ");
-    Serial.println(extra.temp_max);
-    client.stop();
-    return true;
+  Serial.println("Calling weather API");
+  WiFiClientSecure client;
+  client.setInsecure();
+  const char* host = "api.openweathermap.org";
+  const uint16_t port = 443;
+  if (!client.connect(host, port)) {
+    Serial.println("Connection failed");
+    return false;
+  }
+  client.print("GET ");
+  client.print("/data/2.5/weather?lat=");
+  client.print(latitude);
+  client.print("&lon=");
+  client.print(longitude);
+  client.print("&units=");
+  client.print(units);
+  client.print("&lang=");
+  client.print(lang);
+  client.print("en&appid=");
+  client.print(apiKey);
+  client.print(" HTTP/1.1\r\n");
+  client.print("Host: ");
+  client.print(host);
+  client.print("\r\nConnection: close\r\n\r\n");
+  if (client.println() == 0) {
+    Serial.println("Failed to send request");
+    return false;
+  }
+  Serial.println("Sent request, pulling out header");
+  if (!client.find("\r\n\r\n")) {
+    Serial.println("Could not find end of headers");
+    return false;
+  }
+  Serial.println("Found end of header");
+  Serial.println("Parsing JSON");
+  StaticJsonDocument<1024> doc;
+  DeserializationError error = deserializeJson(doc, client);
+  if (error) {
+    Serial.print("JSON deserialization failed: ");
+    Serial.println(error.c_str());
+    return false;
+  }
+  extra.temp_min = doc["main"]["temp_min"];
+  extra.temp_max = doc["main"]["temp_max"];
+  Serial.print("Minimum: ");
+  Serial.println(extra.temp_min);
+  Serial.print("Maximum: ");
+  Serial.println(extra.temp_max);
+  client.stop();
+  return true;
 }
 
 bool updateWeather(bool useScreen) {
@@ -898,22 +900,27 @@ const char* getMeteoconIcon(uint16_t id, bool today = true) {
   return "unknown";
 }
 
-uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
-  uint16_t totalWidth = 0;
+uint16_t getWidthOfText(const char* text) {
   int16_t tx, ty;
   uint16_t tw, th;
+  display.getTextBounds(text, 0, 0, &tx, &ty, &tw, &th);
+  return tw;
+}
+
+uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
+  uint16_t totalWidth = 0;
   const String temp = String(t, 0);
   display.setFont(&FreeMono18pt7b);
   display.setCursor(x, y);
   display.print(temp);
-  display.getTextBounds(temp, x, y, &tx, &ty, &tw, &th);
+  uint16_t tw = getWidthOfText(temp.c_str());
   totalWidth += tw;
   display.setFont(&FreeMono9pt7b);
   const uint16_t nx = x + tw + 6;
   const uint16_t ny = y - 10;
   display.setCursor(nx, ny);
   display.print(unit);
-  display.getTextBounds(unit, nx, ny, &tx, &ty, &tw, &th);
+  tw = getWidthOfText(temp.c_str());
   totalWidth += tw + 6;
   return totalWidth;
 }
@@ -936,11 +943,28 @@ void displayWeather() {
   display.print(georev.country);
 
   display.setFont(&FreeMono24pt7b);
-  display.setCursor(100, 56);
+  display.setCursor(100, 53);
   display.print(current.main);
 
   uint16_t currX = 100;
-  currX += printTemperature(current.temp, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  currX += printTemperature(
+      current.temp, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  display.setFont(&FreeMono18pt7b);
+  display.setCursor(currX, 84);
+  display.print(" (");
+  currX += getWidthOfText(" (");
+  currX += printTemperature(
+      extra.temp_min, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  display.setFont(&FreeMono18pt7b);
+  display.setCursor(currX, 84);
+  display.print("-");
+  currX += getWidthOfText("-");
+  currX += printTemperature(
+      extra.temp_max, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  display.setFont(&FreeMono18pt7b);
+  display.setCursor(currX, 84);
+  display.print(")");
+  currX += getWidthOfText(")");
 
   drawBitmapFromSpiffs(
       String("/icon/" + String(getMeteoconIcon(current.id)) + ".bmp").c_str(),
