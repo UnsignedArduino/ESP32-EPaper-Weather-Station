@@ -914,14 +914,14 @@ uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
   display.setCursor(x, y);
   display.print(temp);
   uint16_t tw = getWidthOfText(temp.c_str());
-  totalWidth += tw;
+  totalWidth += tw + 2;
   display.setFont(&FreeMono9pt7b);
   const uint16_t nx = x + tw + 6;
   const uint16_t ny = y - 10;
   display.setCursor(nx, ny);
   display.print(unit);
   tw = getWidthOfText(temp.c_str());
-  totalWidth += tw + 6;
+  totalWidth += tw + 8;
   return totalWidth;
 }
 
@@ -933,6 +933,10 @@ void displayWeather() {
   Serial.print("Heap: ");
   Serial.print(ESP.getFreeHeap() / 1024);
   Serial.println(" KiB");
+
+  drawBitmapFromSpiffs(
+      String("/icon/" + String(getMeteoconIcon(current.id)) + ".bmp").c_str(),
+      2, 2);
 
   display.setFont(&FreeMono9pt7b);
   display.setCursor(103, 21);
@@ -966,9 +970,43 @@ void displayWeather() {
   display.print(")");
   currX += getWidthOfText(")");
 
-  drawBitmapFromSpiffs(
-      String("/icon/" + String(getMeteoconIcon(current.id)) + ".bmp").c_str(),
-      2, 2);
+  currX = 2;
+  display.setFont(&FreeMono12pt7b);
+  display.setCursor(currX, 104);
+  display.print("Humidity: ");
+  display.print(current.humidity);
+  display.print("%");
+
+  display.setCursor(currX, 126);
+  display.print("Wind: ");
+  display.print(round(current.wind_speed), 0);
+  if (strcmp(units, "imperial") == 0) {
+    display.print(" mph ");
+  } else {
+    display.print(" m/s ");
+  }
+  uint16_t windAngle = (current.wind_deg + 22.5) / 45;
+  if (windAngle > 7) {
+    windAngle = 0;
+  }
+  const char* windText[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  display.print(windText[windAngle]);
+
+  display.setCursor(currX, 148);
+  display.print("UV index: ");
+  display.print(round(current.uvi), 0);
+  // https://www.epa.gov/sunsafety/uv-index-scale-0
+  if (current.uvi >= 11) {
+    display.print(" (extreme)");
+  } else if (current.uvi >= 8) {
+    display.print(" (very high)");
+  } else if (current.uvi >= 6) {
+    display.print(" (high)");
+  } else if (current.uvi >= 3) {
+    display.print(" (moderate)");
+  } else {
+    display.print(" (low)");
+  }
 
   display.display();
 
