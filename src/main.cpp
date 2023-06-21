@@ -254,6 +254,16 @@ wifiConnectFailed:
   return false;
 }
 
+bool disconnectFromWiFi() {
+  Serial.println("Disconnecting and turning WiFi off!");
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  esp_wifi_stop();
+
+  return true;
+}
+
 bool updateTime() {
   Serial.println("Configuring time");
   configTime(TZ_OFFSET, DAYLIGHT_SAVINGS_OFFSET, NTP_SERVER);
@@ -972,12 +982,12 @@ void displayWeather() {
 
   currX = 2;
   display.setFont(&FreeMono12pt7b);
-  display.setCursor(currX, 104);
+  display.setCursor(currX, 114);
   display.print("Humidity: ");
   display.print(current.humidity);
   display.print("%");
 
-  display.setCursor(currX, 126);
+  display.setCursor(currX, 136);
   display.print("Wind: ");
   display.print(round(current.wind_speed), 0);
   if (strcmp(units, "imperial") == 0) {
@@ -992,7 +1002,7 @@ void displayWeather() {
   const char* windText[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
   display.print(windText[windAngle]);
 
-  display.setCursor(currX, 148);
+  display.setCursor(currX, 158);
   display.print("UV index: ");
   display.print(round(current.uvi), 0);
   // https://www.epa.gov/sunsafety/uv-index-scale-0
@@ -1016,6 +1026,8 @@ void displayWeather() {
 }
 
 void setup() {
+  const uint32_t cycleStart = millis();
+
   Serial.begin(SERIAL_SPEED);
   Serial.println();
   pinMode(LED_BUILTIN, OUTPUT);
@@ -1068,7 +1080,15 @@ void setup() {
   updateExtra();
   updateWeather(showBootup);
   printWeather();
+  disconnectFromWiFi();
   displayWeather();
+
+  const uint32_t cycleEnd = millis();
+  const uint32_t cycleTime = cycleEnd - cycleStart;
+
+  Serial.print("Cycle took ");
+  Serial.print(cycleTime / 1000.0);
+  Serial.println(" seconds");
 
   lastUpdateSuccess = true;
   Serial.print("Updating again in ");
