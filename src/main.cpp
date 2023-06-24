@@ -11,10 +11,14 @@
 #include <OpenWeather.h>
 #include <Preferences.h>
 #include <SPIFFS.h>
+#include <TimeLib.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
 #include <time.h>
+
+const char* daysOfTheWeek[8] = {"???", "Sun", "Mon", "Tue",
+                                "Wed", "Thu", "Fri", "Sat"};
 
 // Useful for debugging to go right to the weather screen
 #define FAST_BOOT
@@ -67,6 +71,7 @@ RTC_DATA_ATTR OW_GeocodingReverse georev;
 struct OW_extra {
   float temp_min;
   float temp_max;
+  int32_t timezone;
 };
 // clang-format on
 RTC_DATA_ATTR OW_extra extra;
@@ -379,10 +384,13 @@ bool updateExtra() {
   }
   extra.temp_min = doc["main"]["temp_min"];
   extra.temp_max = doc["main"]["temp_max"];
+  extra.timezone = doc["timezone"];
   Serial.print("Minimum: ");
   Serial.println(extra.temp_min);
   Serial.print("Maximum: ");
   Serial.println(extra.temp_max);
+  Serial.print("Timezone (second offset): ");
+  Serial.println(extra.timezone);
   client.stop();
   return true;
 }
@@ -931,7 +939,7 @@ uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
   display.setCursor(nx, ny);
   display.print(unit);
   tw = getWidthOfText(temp.c_str());
-  totalWidth += tw + 8;
+  totalWidth += tw + 4;
   return totalWidth;
 }
 
@@ -972,7 +980,7 @@ void displayWeather() {
   display.setFont(&FreeMono18pt7b);
   display.setCursor(currX, 84);
   display.print("-");
-  currX += getWidthOfText("-");
+  currX += getWidthOfText("-") + 2;
   currX += printTemperature(
       extra.temp_max, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
   display.setFont(&FreeMono18pt7b);
@@ -1016,6 +1024,32 @@ void displayWeather() {
     display.print(" (moderate)");
   } else {
     display.print(" (low)");
+  }
+
+  display.setFont(&FreeMono12pt7b);
+  const uint8_t charWidth = getWidthOfText("-");
+  uint16_t x = charWidth * 2.5;
+  uint16_t y = 172;
+  for (uint8_t i = 1; i < MAX_DAYS; i++) {
+    Serial.print("Forecast for ");
+    Serial.println(daysOfTheWeek[weekday(daily.dt[i])]);
+    Serial.print("Min: ");
+    Serial.println(round(daily.temp_min[i]), 0);
+    Serial.print("Max: ");
+    Serial.println(round(daily.temp_max[i]), 0);
+    display.setCursor(x, y + 14);
+    display.print(" ");
+    display.print(daysOfTheWeek[weekday(daily.dt[i])]);
+    display.print(" ");
+    display.setCursor(x, y + 36);
+    display.print(round(daily.temp_min[i]), 0);
+    display.print(" ");
+    display.print(round(daily.temp_max[i]), 0);
+    drawBitmapFromSpiffs(
+        String("/icon50/" + String(getMeteoconIcon(daily.id[i])) + ".bmp")
+            .c_str(),
+        x + charWidth, y + 34);
+    x += getWidthOfText(" Sun   ") + 2;
   }
 
   display.display();
