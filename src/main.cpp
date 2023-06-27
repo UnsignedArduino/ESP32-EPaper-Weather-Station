@@ -995,42 +995,42 @@ void displayWeather() {
   display.print(current.humidity);
   display.print("%");
 
-  display.setCursor(currX, 136);
-  display.print("Wind: ");
-  display.print(round(current.wind_speed), 0);
-  if (strcmp(units, "imperial") == 0) {
-    display.print(" mph ");
-  } else {
-    display.print(" m/s ");
-  }
-  uint16_t windAngle = (current.wind_deg + 22.5) / 45;
-  if (windAngle > 7) {
-    windAngle = 0;
-  }
-  const char* windText[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-  display.print(windText[windAngle]);
+  // display.setCursor(currX, 136);
+  // display.print("Wind: ");
+  // display.print(round(current.wind_speed), 0);
+  // if (strcmp(units, "imperial") == 0) {
+  //   display.print(" mph ");
+  // } else {
+  //   display.print(" m/s ");
+  // }
+  // uint16_t windAngle = (current.wind_deg + 22.5) / 45;
+  // if (windAngle > 7) {
+  //   windAngle = 0;
+  // }
+  // const char* windText[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  // display.print(windText[windAngle]);
 
-  display.setCursor(currX, 158);
-  display.print("UV index: ");
-  display.print(round(current.uvi), 0);
-  // https://www.epa.gov/sunsafety/uv-index-scale-0
-  if (current.uvi >= 11) {
-    display.print(" (extreme)");
-  } else if (current.uvi >= 8) {
-    display.print(" (very high)");
-  } else if (current.uvi >= 6) {
-    display.print(" (high)");
-  } else if (current.uvi >= 3) {
-    display.print(" (moderate)");
-  } else {
-    display.print(" (low)");
-  }
+  // display.setCursor(currX, 158);
+  // display.print("UV index: ");
+  // display.print(round(current.uvi), 0);
+  // // https://www.epa.gov/sunsafety/uv-index-scale-0
+  // if (current.uvi >= 11) {
+  //   display.print(" (extreme)");
+  // } else if (current.uvi >= 8) {
+  //   display.print(" (very high)");
+  // } else if (current.uvi >= 6) {
+  //   display.print(" (high)");
+  // } else if (current.uvi >= 3) {
+  //   display.print(" (moderate)");
+  // } else {
+  //   display.print(" (low)");
+  // }
 
   display.setFont(&FreeMono12pt7b);
   const uint8_t charWidth = getWidthOfText("-");
   uint16_t x = charWidth * 2.5;
-  uint16_t y = 172;
-  for (uint8_t i = 1; i < MAX_DAYS; i++) {
+  uint16_t y = 128;
+  for (uint8_t i = 0; i < MAX_DAYS; i++) {
     Serial.print("Forecast for ");
     Serial.println(daysOfTheWeek[weekday(daily.dt[i])]);
     Serial.print("Min: ");
@@ -1038,9 +1038,13 @@ void displayWeather() {
     Serial.print("Max: ");
     Serial.println(round(daily.temp_max[i]), 0);
     display.setCursor(x, y + 14);
-    display.print(" ");
-    display.print(daysOfTheWeek[weekday(daily.dt[i])]);
-    display.print(" ");
+    if (i != 0) {
+      display.print(" ");
+      display.print(daysOfTheWeek[weekday(daily.dt[i])]);
+      display.print(" ");
+    } else {
+      display.print("Today");
+    }
     display.setCursor(x, y + 36);
     display.print(round(daily.temp_min[i]), 0);
     display.print(" ");
@@ -1050,6 +1054,10 @@ void displayWeather() {
             .c_str(),
         x + charWidth, y + 34);
     x += getWidthOfText(" Sun   ") + 2;
+    if ((i + 1) % 4 == 0) {
+      y += 82;
+      x = charWidth * 2.5;
+    }
   }
 
   display.display();
