@@ -10,7 +10,7 @@
     // Hourly forecast not used by TFT_eSPI_OpenWeather example
 
 #define MAX_DAYS                                                               \
-  8 // Maximum "daily" forecast periods can be 1 to 8 (Today + 7 days = 8
+  6 // Maximum "daily" forecast periods can be 1 to 8 (Today + 7 days = 8
     // maximum) TFT_eSPI_OpenWeather example requires this to be >= 5 (today + 4
     // forecast days)
 

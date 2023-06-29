@@ -976,6 +976,8 @@ void displayWeather() {
 
   display.setFont(&FreeMono12pt7b);
   const uint8_t charWidth = getWidthOfText("-");
+  const uint16_t dayWidth =
+      getWidthOfText(" Sun  ") + charWidth* 0.75 + 2;
   uint16_t x = 2;
   uint16_t y = 126;
   for (uint8_t i = 1; i < MAX_DAYS; i++) {
@@ -1001,8 +1003,8 @@ void displayWeather() {
         String("/icon50/" + String(getMeteoconIcon(daily.id[i])) + ".bmp")
             .c_str(),
         x + charWidth, y + 34);
-    x += getWidthOfText(" Sun  ") + charWidth * 0.75 + 2;
-    if (i % 5 == 0) {
+    x += dayWidth;
+    if (x >= 2 + dayWidth * 5) {
       y += 82;
       x = 2;
     }
