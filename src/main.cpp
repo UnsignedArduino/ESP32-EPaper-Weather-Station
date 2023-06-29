@@ -925,6 +925,13 @@ uint16_t getWidthOfText(const char* text) {
   return tw;
 }
 
+uint16_t getHeightOfText(const char* text) {
+  int16_t tx, ty;
+  uint16_t tw, th;
+  display.getTextBounds(text, 0, 0, &tx, &ty, &tw, &th);
+  return th;
+}
+
 uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
   uint16_t totalWidth = 0;
   const String temp = String(t, 0);
@@ -964,27 +971,33 @@ void displayWeather() {
   display.print(", ");
   display.print(georev.country);
 
-  display.setFont(&FreeMono24pt7b);
-  display.setCursor(100, 53);
-  display.print(current.main);
-
+  uint16_t currY = 53;
   uint16_t currX = 100;
+
+  display.setCursor(currX, currY);
+  display.setFont(current.main.length() > 10 ? &FreeMono18pt7b
+                                             : &FreeMono24pt7b);
+  display.print(current.main);
+  currY += getHeightOfText(current.main.c_str()) + 6;
+
   currX += printTemperature(
-      current.temp, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+      current.temp, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, currY);
   display.setFont(&FreeMono18pt7b);
-  display.setCursor(currX, 84);
+  display.setCursor(currX, currY);
   display.print(" (");
   currX += getWidthOfText(" (");
-  currX += printTemperature(
-      extra.temp_min, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  currX += printTemperature(daily.temp_min[0],
+                            strcmp(units, "imperial") == 0 ? "oF" : "oC", currX,
+                            currY);
   display.setFont(&FreeMono18pt7b);
-  display.setCursor(currX, 84);
+  display.setCursor(currX, currY);
   display.print("-");
   currX += getWidthOfText("-") + 2;
-  currX += printTemperature(
-      extra.temp_max, strcmp(units, "imperial") == 0 ? "oF" : "oC", currX, 84);
+  currX += printTemperature(daily.temp_max[0],
+                            strcmp(units, "imperial") == 0 ? "oF" : "oC", currX,
+                            currY);
   display.setFont(&FreeMono18pt7b);
-  display.setCursor(currX, 84);
+  display.setCursor(currX, currY);
   display.print(")");
   currX += getWidthOfText(")");
 
@@ -1028,9 +1041,9 @@ void displayWeather() {
 
   display.setFont(&FreeMono12pt7b);
   const uint8_t charWidth = getWidthOfText("-");
-  uint16_t x = charWidth * 2.5;
-  uint16_t y = 128;
-  for (uint8_t i = 0; i < MAX_DAYS; i++) {
+  uint16_t x = 2;
+  uint16_t y = 126;
+  for (uint8_t i = 1; i < MAX_DAYS; i++) {
     Serial.print("Forecast for ");
     Serial.println(daysOfTheWeek[weekday(daily.dt[i])]);
     Serial.print("Min: ");
@@ -1053,10 +1066,10 @@ void displayWeather() {
         String("/icon50/" + String(getMeteoconIcon(daily.id[i])) + ".bmp")
             .c_str(),
         x + charWidth, y + 34);
-    x += getWidthOfText(" Sun   ") + 2;
-    if ((i + 1) % 4 == 0) {
+    x += getWidthOfText(" Sun  ") + charWidth * 0.75 + 2;
+    if (i % 5 == 0) {
       y += 82;
-      x = charWidth * 2.5;
+      x = 2;
     }
   }
 
@@ -1119,7 +1132,7 @@ void setup() {
                    "geocoding API");
     updateGeocodingReverse();
   }
-  updateExtra();
+  // updateExtra();
   updateWeather(showBootup);
   printWeather();
   disconnectFromWiFi();
