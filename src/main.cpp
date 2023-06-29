@@ -67,15 +67,6 @@ struct OW_GeocodingReverse {
 // clang-format on
 RTC_DATA_ATTR OW_GeocodingReverse georev;
 
-// clang-format off
-struct OW_extra {
-  float temp_min;
-  float temp_max;
-  int32_t timezone;
-};
-// clang-format on
-RTC_DATA_ATTR OW_extra extra;
-
 struct tm timeInfo;
 
 RTC_DATA_ATTR bool lastUpdateSuccess = false;
@@ -335,62 +326,6 @@ bool updateGeocodingReverse() {
   Serial.println(georev.state);
   Serial.print("Country: ");
   Serial.println(georev.country);
-  client.stop();
-  return true;
-}
-
-bool updateExtra() {
-  Serial.println("Calling weather API");
-  WiFiClientSecure client;
-  client.setInsecure();
-  const char* host = "api.openweathermap.org";
-  const uint16_t port = 443;
-  if (!client.connect(host, port)) {
-    Serial.println("Connection failed");
-    return false;
-  }
-  client.print("GET ");
-  client.print("/data/2.5/weather?lat=");
-  client.print(latitude);
-  client.print("&lon=");
-  client.print(longitude);
-  client.print("&units=");
-  client.print(units);
-  client.print("&lang=");
-  client.print(lang);
-  client.print("en&appid=");
-  client.print(apiKey);
-  client.print(" HTTP/1.1\r\n");
-  client.print("Host: ");
-  client.print(host);
-  client.print("\r\nConnection: close\r\n\r\n");
-  if (client.println() == 0) {
-    Serial.println("Failed to send request");
-    return false;
-  }
-  Serial.println("Sent request, pulling out header");
-  if (!client.find("\r\n\r\n")) {
-    Serial.println("Could not find end of headers");
-    return false;
-  }
-  Serial.println("Found end of header");
-  Serial.println("Parsing JSON");
-  StaticJsonDocument<1024> doc;
-  DeserializationError error = deserializeJson(doc, client);
-  if (error) {
-    Serial.print("JSON deserialization failed: ");
-    Serial.println(error.c_str());
-    return false;
-  }
-  extra.temp_min = doc["main"]["temp_min"];
-  extra.temp_max = doc["main"]["temp_max"];
-  extra.timezone = doc["timezone"];
-  Serial.print("Minimum: ");
-  Serial.println(extra.temp_min);
-  Serial.print("Maximum: ");
-  Serial.println(extra.temp_max);
-  Serial.print("Timezone (second offset): ");
-  Serial.println(extra.timezone);
   client.stop();
   return true;
 }
@@ -1132,7 +1067,6 @@ void setup() {
                    "geocoding API");
     updateGeocodingReverse();
   }
-  // updateExtra();
   updateWeather(showBootup);
   printWeather();
   disconnectFromWiFi();
