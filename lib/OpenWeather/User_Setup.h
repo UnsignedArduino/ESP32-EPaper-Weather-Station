@@ -6,7 +6,7 @@
 // collection of the data points.
 
 #define MAX_HOURS                                                              \
-  6 // Maximum "hourly" forecast period, can be up 1 to 48
+  5 // Maximum "hourly" forecast period, can be up 1 to 48
     // Hourly forecast not used by TFT_eSPI_OpenWeather example
 
 #define MAX_DAYS                                                               \

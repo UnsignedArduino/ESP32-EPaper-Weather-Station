@@ -262,7 +262,9 @@ bool disconnectFromWiFi() {
 
 bool updateTime() {
   Serial.println("Configuring time");
-  configTime(TZ_OFFSET, DAYLIGHT_SAVINGS_OFFSET, NTP_SERVER);
+  Serial.print("Timezone offset: ");
+  Serial.println(ow.timezoneOffset);
+  configTime(ow.timezoneOffset, DAYLIGHT_SAVINGS_OFFSET, NTP_SERVER);
   if (!getLocalTime(&timeInfo)) {
     Serial.println("Failed to obtain time");
     return false;
@@ -806,9 +808,8 @@ void drawBitmapFromSpiffs(const char* filename, int16_t x, int16_t y,
   }
 }
 
-const char* getMeteoconIcon(uint16_t id, bool today = true) {
-  if (today && id / 100 == 8 &&
-      (current.dt < current.sunrise || current.dt > current.sunset))
+const char* getMeteoconIcon(uint16_t id, bool nightVersion = false) {
+  if (nightVersion && id / 100 == 8)
     id += 1000;
 
   if (id / 100 == 2)
@@ -883,6 +884,16 @@ uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
   tw = getWidthOfText(temp.c_str());
   totalWidth += tw + 4;
   return totalWidth;
+}
+
+bool isDuringNight(uint32_t t) {
+  for (uint8_t i = 0; i < MAX_DAYS; i ++) {
+    const uint32_t sunrise = daily.sunrise[i];
+    if (day(sunrise) == day(t) && month(sunrise) == month(t)) {
+      return t < sunrise || t > daily.sunset[i];
+    }
+  }
+  return false;
 }
 
 void displayWeather() {
@@ -975,14 +986,47 @@ void displayWeather() {
   // }
 
   display.setFont(&FreeMono12pt7b);
+
   const uint8_t charWidth = getWidthOfText("-");
-  const uint16_t dayWidth =
-      getWidthOfText(" Sun  ") + charWidth* 0.75 + 2;
   uint16_t x = 2;
   uint16_t y = 126;
-  for (uint8_t i = 1; i < MAX_DAYS; i++) {
+  const uint16_t itemWidth = getWidthOfText(" Sun  ") + charWidth * 0.75 + 2;
+
+  for (uint8_t i = 0; i < MAX_HOURS; i++) {
+    const uint32_t d = hourly.dt[i] + ow.timezoneOffset;
     Serial.print("Forecast for ");
-    Serial.println(daysOfTheWeek[weekday(daily.dt[i])]);
+    char timeBuf[6];
+    snprintf(timeBuf, 6, "%02d:%02d", hour(d), minute(d));
+    timeBuf[5] = 0;
+    Serial.print(strTime(d));
+    Serial.print("(");
+    Serial.print(timeBuf);
+    Serial.println(")");
+    Serial.print("Temp: ");
+    Serial.println(hourly.temp[i]);
+    display.setCursor(x, y + 14);
+    display.print(timeBuf);
+    const int16_t temp = hourly.temp[i];
+    char tempBuf[6];
+    memset(tempBuf, 0, 6);
+    snprintf(tempBuf, 6, "%d", temp);
+    display.setCursor(x + charWidth * 3 - getWidthOfText(tempBuf) / 2, y + 36);
+    display.print(tempBuf);
+    drawBitmapFromSpiffs(
+        String("/icon50/" +
+               String(getMeteoconIcon(hourly.id[i], isDuringNight(d))) +
+               ".bmp")
+            .c_str(),
+        x + charWidth, y + 34);
+    x += itemWidth;
+  }
+
+  x = 2;
+  y = 208;
+  for (uint8_t i = 1; i < MAX_DAYS; i++) {
+    const uint32_t d = daily.dt[i] + ow.timezoneOffset;
+    Serial.print("Forecast for ");
+    Serial.println(daysOfTheWeek[weekday(d)]);
     Serial.print("Min: ");
     Serial.println(round(daily.temp_min[i]), 0);
     Serial.print("Max: ");
@@ -990,24 +1034,31 @@ void displayWeather() {
     display.setCursor(x, y + 14);
     if (i != 0) {
       display.print(" ");
-      display.print(daysOfTheWeek[weekday(daily.dt[i])]);
+      display.print(daysOfTheWeek[weekday(d)]);
       display.print(" ");
     } else {
       display.print("Today");
     }
     display.setCursor(x, y + 36);
-    display.print(round(daily.temp_min[i]), 0);
+    const int16_t tempMin = round(daily.temp_min[i]);
+    if (tempMin >= 0 && tempMin <= 9) {
+      display.print(" ");
+    }
+    display.print(tempMin, 0);
     display.print(" ");
-    display.print(round(daily.temp_max[i]), 0);
+    const int16_t tempMax = round(daily.temp_max[i]);
+    if (tempMax >= 0 && tempMin <= 9) {
+      display.print(" ");
+    }
+    display.print(tempMax, 0);
     drawBitmapFromSpiffs(
-        String("/icon50/" + String(getMeteoconIcon(daily.id[i])) + ".bmp")
+        String("/icon50/" +
+               String(getMeteoconIcon(daily.id[i], (d < daily.sunrise[i] ||
+                                                    d > daily.sunset[i]))) +
+               ".bmp")
             .c_str(),
         x + charWidth, y + 34);
-    x += dayWidth;
-    if (x >= 2 + dayWidth * 5) {
-      y += 82;
-      x = 2;
-    }
+    x += itemWidth;
   }
 
   display.display();
@@ -1063,13 +1114,13 @@ void setup() {
   esp_sleep_enable_ext0_wakeup(USER_BTN_RTC_PIN, 0);
 
   connectToWiFi(showBootup);
-  updateTime();
   if (strlen(georev.name) == 0) {
     Serial.println("Determined name from coordinates empty, calling reverse "
                    "geocoding API");
     updateGeocodingReverse();
   }
   updateWeather(showBootup);
+  updateTime();
   printWeather();
   disconnectFromWiFi();
   displayWeather();

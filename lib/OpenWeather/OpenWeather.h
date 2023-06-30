@@ -57,6 +57,7 @@ class OW_Weather: public JsonListener {
     float    lat = 0;
     float    lon = 0;
     String   timezone = "";
+    int32_t  timezoneOffset = 0;
 
   private: // Streaming parser callback functions, allow tracking and decisions
 
