@@ -989,7 +989,7 @@ void displayWeather() {
 
   const uint8_t charWidth = getWidthOfText("-");
   uint16_t x = 2;
-  uint16_t y = 126;
+  uint16_t y = 128;
   const uint16_t itemWidth = getWidthOfText(" Sun  ") + charWidth * 0.75 + 2;
 
   for (uint8_t i = 0; i < MAX_HOURS; i++) {
@@ -1022,7 +1022,7 @@ void displayWeather() {
   }
 
   x = 2;
-  y = 208;
+  y = 212;
   for (uint8_t i = 1; i < MAX_DAYS; i++) {
     const uint32_t d = daily.dt[i] + ow.timezoneOffset;
     Serial.print("Forecast for ");
