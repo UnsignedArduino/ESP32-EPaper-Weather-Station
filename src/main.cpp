@@ -887,10 +887,11 @@ uint16_t printTemperature(float t, const char* unit, uint16_t x, uint16_t y) {
 }
 
 bool isDuringNight(uint32_t t) {
-  for (uint8_t i = 0; i < MAX_DAYS; i ++) {
-    const uint32_t sunrise = daily.sunrise[i];
+  for (uint8_t i = 0; i < MAX_DAYS; i++) {
+    const uint32_t sunrise = daily.sunrise[i] + ow.timezoneOffset;
+    const uint32_t sunset = daily.sunset[i] + ow.timezoneOffset;
     if (day(sunrise) == day(t) && month(sunrise) == month(t)) {
-      return t < sunrise || t > daily.sunset[i];
+      return t < sunrise || t > sunset;
     }
   }
   return false;
@@ -906,7 +907,7 @@ void displayWeather() {
   Serial.println(" KiB");
 
   drawBitmapFromSpiffs(
-      String("/icon/" + String(getMeteoconIcon(current.id)) + ".bmp").c_str(),
+      String("/icon/" + String(getMeteoconIcon(current.id, isDuringNight(current.dt))) + ".bmp").c_str(),
       2, 2);
 
   display.setFont(&FreeMono9pt7b);
@@ -1014,8 +1015,7 @@ void displayWeather() {
     display.print(tempBuf);
     drawBitmapFromSpiffs(
         String("/icon50/" +
-               String(getMeteoconIcon(hourly.id[i], isDuringNight(d))) +
-               ".bmp")
+               String(getMeteoconIcon(hourly.id[i], isDuringNight(d))) + ".bmp")
             .c_str(),
         x + charWidth, y + 34);
     x += itemWidth;
