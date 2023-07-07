@@ -29,8 +29,8 @@ const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
 
 const char* CONFIG_AP_NAME = "WeatherStationConfig";
 
-const uint32_t FAIL_RETRY_TIME = 2; // minutes
-const uint32_t UPDATE_TIME = 10;    // minutes
+const uint32_t FAIL_RETRY_TIME = 5; // minutes
+const uint32_t UPDATE_TIME = 15;    // minutes
 
 const char* NTP_SERVER = "pool.ntp.org";
 
@@ -907,7 +907,11 @@ void displayWeather() {
   Serial.println(" KiB");
 
   drawBitmapFromSpiffs(
-      String("/icon/" + String(getMeteoconIcon(current.id, isDuringNight(current.dt))) + ".bmp").c_str(),
+      String("/icon/" +
+             String(getMeteoconIcon(
+                 current.id, isDuringNight(current.dt + ow.timezoneOffset))) +
+             ".bmp")
+          .c_str(),
       2, 2);
 
   display.setFont(&FreeMono9pt7b);
