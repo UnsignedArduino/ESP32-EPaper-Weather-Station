@@ -21,11 +21,19 @@ const char* daysOfTheWeek[8] = {"???", "Sun", "Mon", "Tue",
                                 "Wed", "Thu", "Fri", "Sat"};
 
 // Useful for debugging to go right to the weather screen
-#define FAST_BOOT
+// #define FAST_BOOT
 const uint32_t SERIAL_SPEED = 115200;
 
 const uint8_t USER_BTN_PIN = 27;
 const gpio_num_t USER_BTN_RTC_PIN = GPIO_NUM_27;
+
+const uint8_t CHARGING_DETECT_PIN = 36;
+const uint8_t BATT_PIN = 39;
+
+const uint8_t BATTERY_DISCHARGING = 0;
+const uint8_t BATTERY_CHARGING = 1;
+const uint8_t BATTERY_LOW = 2;
+uint8_t battState = BATTERY_DISCHARGING;
 
 const char* CONFIG_AP_NAME = "WeatherStationConfig";
 
@@ -348,6 +356,29 @@ bool updateWeather(bool useScreen) {
     delay(5000);
   }
   return success;
+}
+
+bool updateBattery() {
+  const uint32_t chargeVolt = analogReadMilliVolts(CHARGING_DETECT_PIN) * 2;
+  const uint32_t lowBattVolt = analogReadMilliVolts(BATT_PIN) * 2;
+  Serial.print("Charging voltage: ");
+  Serial.print(chargeVolt);
+  Serial.println(" mv");
+  Serial.print("Battery voltage: ");
+  Serial.print(lowBattVolt);
+  Serial.println(" mv");
+
+  if (chargeVolt > 2000) {
+    Serial.println("Charging detected");
+    battState = BATTERY_CHARGING;
+  } else if (lowBattVolt < 1000) {
+    Serial.println("Low battery detected");
+    battState = BATTERY_LOW;
+  } else {
+    Serial.println("Battery discharging");
+    battState = BATTERY_DISCHARGING;
+  }
+  return true;
 }
 
 // https://github.com/Bodmer/OpenWeather/blob/main/examples/Onecall%20API%20(subscription%20required)/My_OpenWeather_Test/My_OpenWeather_Test.ino#L95
@@ -959,6 +990,18 @@ void displayWeather() {
   display.print(current.humidity);
   display.print("%");
 
+  const char* batt = battState == BATTERY_CHARGING
+                         ? "Charging"
+                         : (battState == BATTERY_LOW ? "Battery low" : "");
+  const uint16_t width = getWidthOfText(batt) + getWidthOfText("#");
+  Serial.println("Battery text: ");
+  Serial.println(batt);
+  currX = display.width() - width - 2;
+  Serial.println(currX);
+  display.setFont(&FreeMono12pt7b);
+  display.setCursor(currX, 114);
+  display.print(batt);
+
   // display.setCursor(currX, 136);
   // display.print("Wind: ");
   // display.print(round(current.wind_speed), 0);
@@ -1127,6 +1170,7 @@ void setup() {
   updateTime();
   printWeather();
   disconnectFromWiFi();
+  updateBattery();
   displayWeather();
 
   const uint32_t cycleEnd = millis();
